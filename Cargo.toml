@@ -1,0 +1,16 @@
+[package]
+name = "nanpa"
+version = "0.1.0"
+description = "a language-agnostic release manager"
+license = "MIT"
+authors = ["aoife cassidy <aoife@enby.space>"]
+homepage = "https://sr.ht/~nbsp/nanpa"
+repository = "https://git.sr.ht/~nbsp/nanpa"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.8", features = ["derive"] }
+colored = "2.1.0"
