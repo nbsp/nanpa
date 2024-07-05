@@ -22,7 +22,7 @@
 
         # For `nix develop`:
         devShell = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [ rustc cargo rust-analyzer clippy ];
+          nativeBuildInputs = with pkgs; [ rustc cargo rust-analyzer clippy rustfmt ];
         };
       }
     );

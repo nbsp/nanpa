@@ -1,14 +1,14 @@
-use clap::{Parser, Subcommand, Args};
 use crate::nanpa;
+use clap::{Args, Parser, Subcommand};
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(about, version, infer_subcommands = true)]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 enum Commands {
     /// Bump package version
     #[command(args_conflicts_with_subcommands = true)]
@@ -18,13 +18,14 @@ enum Commands {
 
         #[command(flatten)]
         custom_version: Option<CustomVersion>,
+
+        package: Option<String>,
     },
     /// Show current package version
     Version,
 }
 
-
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 pub enum SemverVersion {
     #[command(alias = "x")]
     Major,
@@ -32,17 +33,17 @@ pub enum SemverVersion {
     Minor,
     #[command(alias = "z")]
     Patch,
-    Prerelease(Prerelease)
+    Prerelease(Prerelease),
 }
 
-#[derive(Args, Debug)]
-struct Prerelease {
-    version: String,
+#[derive(Args)]
+pub struct Prerelease {
+    pub version: String,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args)]
 struct CustomVersion {
-    version: String,
+    pub version: String,
 }
 
 pub fn command() {
@@ -50,15 +51,25 @@ pub fn command() {
     let nanpa = nanpa::new();
 
     match &cli.command {
-        Commands::Bump { semver_version, custom_version } => {
+        Commands::Bump {
+            semver_version,
+            custom_version,
+            package,
+        } => {
             if let Some(version) = semver_version {
-                nanpa.bump_semver(&version);
+                nanpa.bump_semver(version, package.clone());
             } else {
-                nanpa.bump_custom(custom_version.unwrap());
+                nanpa.bump_custom(
+                    custom_version.as_ref().unwrap().version.clone(),
+                    package.clone(),
+                );
             }
-        },
+        }
         Commands::Version => {
-            nanpa.get_version();
+            let versions = nanpa.get_version();
+            for (location, version) in versions {
+                println!("{}: {}", location, version);
+            }
         }
     }
 }

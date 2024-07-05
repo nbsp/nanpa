@@ -1,5 +1,5 @@
-use std::{env, path::PathBuf};
 use colored::Colorize;
+use std::{env, path::PathBuf};
 
 pub fn find_root() -> Option<PathBuf> {
     let mut dir = env::current_dir().unwrap();

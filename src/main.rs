@@ -1,8 +1,8 @@
 mod cli;
-mod util;
 mod nanpa;
+mod package;
+mod util;
 
 fn main() {
     cli::command();
 }
-
