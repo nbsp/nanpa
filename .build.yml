@@ -1,9 +1,15 @@
 image: alpine/edge
 packages:
   - cargo
+  - scdoc
 sources:
   - https://github.com/nbsp/nanpa
 tasks:
   - build: |
       cd nanpa
       cargo build --release
+  - doc: |
+      cd nanpa/doc
+      scdoc < nanpa.1.scd
+      scdoc < nanparc.5.scd
+      scdoc < nanpa-changeset.5.scd

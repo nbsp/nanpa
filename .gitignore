@@ -1,2 +1,4 @@
 /target
 .direnv
+*.1
+*.5
