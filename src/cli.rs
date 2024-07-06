@@ -1,6 +1,7 @@
 use crate::nanpa;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
+use colored::Colorize;
 
 #[derive(Parser)]
 #[command(about, version, infer_subcommands = true)]
@@ -32,6 +33,8 @@ enum Commands {
 
         package: Option<String>,
     },
+    /// List supported languages
+    ListLanguages,
 }
 
 #[derive(Subcommand)]
@@ -81,6 +84,23 @@ pub fn command() -> Result<()> {
             }
         }
         Commands::Changeset { package, yes } => nanpa.changesets(package.clone(), yes.clone())?,
+        Commands::ListLanguages => {
+            println!("{}", "Supported languages:".bold().underline());
+            println!(
+                "Rust Cargo\t {} (or {})",
+                "cargo".yellow().bold(),
+                "rust".yellow()
+            );
+            println!(
+                "Node.js\t\t {} (or {}, {}, {}, {})",
+                "node".yellow().bold(),
+                "javascript".yellow(),
+                "js".yellow(),
+                "typescript".yellow(),
+                "ts".yellow(),
+            );
+            println!("Go\t\t {}", "go".yellow().bold(),);
+        }
     }
 
     Ok(())
