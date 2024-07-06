@@ -1,5 +1,5 @@
-use crate::cli::SemverVersion;
 use crate::package;
+use crate::{cli::SemverVersion, languages};
 use anyhow::{bail, Result};
 use chrono;
 use glob::glob;
@@ -177,6 +177,7 @@ fn write_semver(package: package::Package, version: &SemverVersion) -> Result<St
             parsed.to_string()
         );
 
+        run_language(package.clone(), parsed.to_string())?;
         run_custom(package)?;
 
         Ok(parsed.to_string())
@@ -211,6 +212,7 @@ fn write_custom(package: package::Package, version: String) -> Result<()> {
     f.write_all((lines.join("\n") + "\n").as_bytes())?;
     f.flush()?;
 
+    run_language(package.clone(), version)?;
     run_custom(package)?;
     Ok(())
 }
@@ -504,4 +506,12 @@ impl Changelog {
 
         ret
     }
+}
+
+fn run_language(package: package::Package, version: String) -> Result<()> {
+    if let Some(language) = package.language {
+        languages::run_language(language, version, package.location.clone())?;
+    }
+
+    Ok(())
 }

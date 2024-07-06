@@ -1,4 +1,5 @@
 mod cli;
+mod languages;
 mod nanpa;
 mod package;
 
