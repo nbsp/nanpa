@@ -1,6 +1,9 @@
 use crate::cli::SemverVersion;
 use crate::package;
 use anyhow::{bail, Result};
+use chrono;
+use glob::glob;
+use kdl::{KdlDocument, KdlNode};
 use semver;
 use std::{
     collections, env, fs,
@@ -93,9 +96,33 @@ impl Nanpa {
 
         Ok(())
     }
+
+    pub fn changesets(&self, package: Option<String>) -> Result<()> {
+        if let Some(path) = package {
+            let path = path::PathBuf::from(path);
+            let path = fs::canonicalize(&path).unwrap();
+            if let Some(package) = self.packages().get(path.to_str().unwrap()).cloned() {
+                changesets(package)?;
+            } else {
+                bail!("could not find package");
+            }
+        } else if self.packages.len() == 1 && self.packages[0].location == find_root(false).unwrap()
+        {
+            changesets(
+                self.packages()
+                    .get(find_root(false).unwrap().to_str().unwrap())
+                    .unwrap()
+                    .clone(),
+            )?
+        } else {
+            todo!("update all packages under tree");
+        }
+
+        Ok(())
+    }
 }
 
-fn write_semver(package: package::Package, version: &SemverVersion) -> Result<()> {
+fn write_semver(package: package::Package, version: &SemverVersion) -> Result<String> {
     let file = match fs::File::open(package.location.join(".nanparc")) {
         Ok(file) => io::BufReader::new(file),
         Err(e) => {
@@ -150,11 +177,11 @@ fn write_semver(package: package::Package, version: &SemverVersion) -> Result<()
         );
 
         run_custom(package)?;
+
+        Ok(parsed.to_string())
     } else {
         bail!("package version is not a valid semver version");
     }
-
-    Ok(())
 }
 
 fn write_custom(package: package::Package, version: String) -> Result<()> {
@@ -218,4 +245,194 @@ fn run_custom(package: package::Package) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn changesets(package: package::Package) -> Result<()> {
+    let mut bump = 0;
+    let mut changelog = Changelog::new();
+
+    env::set_current_dir(find_root(false).unwrap())?;
+    for file in glob(".nanpa/*.kdl")? {
+        let file = file?;
+        let changeset: KdlDocument = fs::read_to_string(file.clone())?.parse()?;
+        let nodes: Vec<&KdlNode> = changeset
+            .nodes()
+            .iter()
+            .filter(|change| {
+                change.get("package").is_some_and(|path| {
+                    package.location == fs::canonicalize(path.to_string()).unwrap()
+                })
+            })
+            .collect();
+        let delete = !nodes.is_empty();
+        for node in nodes {
+            if node.get(0).cloned().is_some() {
+                match node.name().to_string().as_str() {
+                    "major" => {
+                        bump = 3;
+                        changelog.push(node.clone())?;
+                    }
+                    "minor" => {
+                        if bump < 2 {
+                            bump = 2;
+                        }
+                        changelog.push(node.clone())?;
+                    }
+                    "patch" => {
+                        if bump == 0 {
+                            bump = 1;
+                        }
+                        changelog.push(node.clone())?;
+                    }
+                    unknown => bail!("unknown keyword {unknown}"),
+                }
+            }
+        }
+        if delete {
+            fs::remove_file(file)?
+        }
+    }
+
+    env::set_current_dir(package.location.clone())?;
+    for file in glob(".nanpa/*.kdl")? {
+        let file = file?;
+        let changeset: KdlDocument = fs::read_to_string(file.clone())?.parse()?;
+        for node in changeset.nodes() {
+            if node.get(0).cloned().is_some() {
+                match node.name().to_string().as_str() {
+                    "major" => {
+                        bump = 3;
+                        changelog.push(node.clone())?;
+                    }
+                    "minor" => {
+                        if bump < 2 {
+                            bump = 2;
+                        }
+                        changelog.push(node.clone())?;
+                    }
+                    "patch" => {
+                        if bump == 0 {
+                            bump = 1;
+                        }
+                        changelog.push(node.clone())?;
+                    }
+                    unknown => bail!("unknown keyword {unknown}"),
+                }
+            }
+        }
+        fs::remove_file(file)?;
+    }
+
+    let version = match bump {
+        0 => return Ok(()),
+        1 => write_semver(package, &SemverVersion::Patch)?,
+        2 => write_semver(package, &SemverVersion::Minor)?,
+        3 => write_semver(package, &SemverVersion::Major)?,
+        _ => bail!("something has gone horribly wrong"),
+    };
+
+    let markdown = changelog.markdown(version);
+    println!("{markdown}");
+
+    Ok(())
+}
+
+struct Changelog {
+    pub added: Vec<String>,
+    pub changed: Vec<String>,
+    pub deprecated: Vec<String>,
+    pub removed: Vec<String>,
+    pub fixed: Vec<String>,
+    pub security: Vec<String>,
+}
+
+impl Changelog {
+    pub fn new() -> Self {
+        Self {
+            added: vec![],
+            changed: vec![],
+            deprecated: vec![],
+            removed: vec![],
+            fixed: vec![],
+            security: vec![],
+        }
+    }
+
+    pub fn push(&mut self, change: KdlNode) -> Result<()> {
+        if let Some(change_type) = change.get("type") {
+            let change = change
+                .get(0)
+                .unwrap()
+                .value()
+                .as_string()
+                .unwrap()
+                .to_string();
+            match change_type.value().as_string().unwrap() {
+                "added" => self.added.push(change),
+                "changed" => self.changed.push(change),
+                "deprecated" => self.deprecated.push(change),
+                "removed" => self.removed.push(change),
+                "fixed" => self.fixed.push(change),
+                "security" => self.security.push(change),
+                unknown => bail!("unknown change type {unknown}"),
+            };
+        } else {
+            bail!("change type (added, changed, etc.) must be specified")
+        }
+
+        Ok(())
+    }
+
+    pub fn markdown(&mut self, version: String) -> String {
+        let mut ret = format!(
+            "## [{}] - {}\n\n",
+            version,
+            chrono::Utc::now().format("%Y-%m-%d")
+        );
+
+        if !self.added.is_empty() {
+            ret += "### Added\n\n";
+            for item in self.added.clone() {
+                ret += format!("- {item}\n").as_str();
+            }
+            ret += "\n";
+        }
+        if !self.changed.is_empty() {
+            ret += "### Changed\n\n";
+            for item in self.changed.clone() {
+                ret += format!("- {item}\n").as_str();
+            }
+            ret += "\n";
+        }
+        if !self.deprecated.is_empty() {
+            ret += "### Deprecated\n\n";
+            for item in self.deprecated.clone() {
+                ret += format!("- {item}\n").as_str();
+            }
+            ret += "\n";
+        }
+        if !self.removed.is_empty() {
+            ret += "### Removed\n\n";
+            for item in self.removed.clone() {
+                ret += format!("- {item}\n").as_str();
+            }
+            ret += "\n";
+        }
+        if !self.fixed.is_empty() {
+            ret += "### Fixed\n\n";
+            for item in self.fixed.clone() {
+                ret += format!("- {item}\n").as_str();
+            }
+            ret += "\n";
+        }
+        if !self.security.is_empty() {
+            ret += "### Security\n\n";
+            for item in self.security.clone() {
+                ret += format!("- {item}\n").as_str();
+            }
+            ret += "\n";
+        }
+
+        ret
+    }
 }

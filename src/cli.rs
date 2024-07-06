@@ -11,7 +11,11 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Bump package version
+    /// Show current package version
+    Version,
+    /// Bump package version from changesets and generate changelog entry
+    Changeset { package: Option<String> },
+    /// Manually bump package version
     #[command(args_conflicts_with_subcommands = true)]
     Bump {
         #[command(subcommand)]
@@ -22,8 +26,6 @@ enum Commands {
 
         package: Option<String>,
     },
-    /// Show current package version
-    Version,
 }
 
 #[derive(Subcommand)]
@@ -72,6 +74,7 @@ pub fn command() -> Result<()> {
                 println!("{}: {}", location, package.version.unwrap());
             }
         }
+        Commands::Changeset { package } => nanpa.changesets(package.clone())?,
     }
 
     Ok(())
