@@ -116,7 +116,9 @@ impl Nanpa {
                 yes,
             )?
         } else {
-            todo!("update all packages under tree");
+            for package in self.packages().values() {
+                changesets(package.clone(), yes)?;
+            }
         }
 
         Ok(())

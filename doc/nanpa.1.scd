@@ -22,7 +22,8 @@ versions, if its config has a _packages_ option.
 *nanpa changesets* [_package_] reads changeset files in _.nanpa/\*.kdl_ into a
 _CHANGELOG.md_ file, formatted in the style of _Keep a Changelog_, then bumps
 the package version accordingly. If _package_ isn't provided, *nanpa* will
-traverse up the tree until it finds a *.nanparc* file.
+traverse up the tree until it finds a *.nanparc* file. If the found *.nanparc*
+file includes subpackages, *nanpa changesets* will be run for each of them.
 
 *nanpa bump* <major|minor|patch|pre _prerelease_|_custom_> [_package_] manually
 bumps the package version, either according to Semantic Versioning or with a
