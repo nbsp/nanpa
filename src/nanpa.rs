@@ -18,7 +18,7 @@ pub struct Nanpa {
 impl Nanpa {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            packages: match find_root() {
+            packages: match find_root(true) {
                 Some(path) => package::Package::get(path)?.flatten()?,
                 None => {
                     bail!("could not find .nanparc file");
@@ -42,41 +42,30 @@ impl Nanpa {
 
     pub fn bump_semver(&self, version: &SemverVersion, package: Option<String>) -> Result<()> {
         if let Some(path) = package {
-            todo!();
-        } else if self.packages.len() == 1 {
-            if let Ok(mut parsed) =
-                semver::Version::parse(self.packages[0].version.clone().unwrap().as_str())
-            {
-                match version {
-                    SemverVersion::Major => {
-                        parsed.major += 1;
-                        parsed.minor = 0;
-                        parsed.patch = 0;
-                        parsed.pre = semver::Prerelease::new("").unwrap();
-                    }
-                    SemverVersion::Minor => {
-                        parsed.minor += 1;
-                        parsed.patch = 0;
-                        parsed.pre = semver::Prerelease::new("").unwrap();
-                    }
-                    SemverVersion::Patch => {
-                        parsed.patch += 1;
-                        parsed.pre = semver::Prerelease::new("").unwrap();
-                    }
-                    SemverVersion::Prerelease(x) => {
-                        parsed.pre = semver::Prerelease::new(x.version.as_str()).unwrap()
-                    }
-                };
-
-                println!(
-                    "{} -> {}",
-                    self.packages[0].version.clone().unwrap(),
-                    parsed.to_string()
-                );
-                todo!();
+            let path = path::PathBuf::from(path);
+            let path = fs::canonicalize(&path).unwrap();
+            if self.get_version().contains_key(path.to_str().unwrap()) {
+                write_semver(
+                    path.clone(),
+                    self.get_version()
+                        .get(path.to_str().unwrap())
+                        .unwrap()
+                        .clone(),
+                    version,
+                )?;
             } else {
-                bail!("package version is not a valid semver version");
+                bail!("could not find package");
             }
+        } else if self.packages.len() == 1 && self.packages[0].location == find_root(false).unwrap()
+        {
+            write_semver(
+                find_root(false).unwrap(),
+                self.get_version()
+                    .get(find_root(false).unwrap().to_str().unwrap())
+                    .unwrap()
+                    .clone(),
+                version,
+            )?;
         } else {
             bail!("no package specified and more than one package in tree");
         }
@@ -93,8 +82,9 @@ impl Nanpa {
             } else {
                 bail!("could not find package");
             }
-        } else if self.packages.len() == 1 {
-            write_custom(std::env::current_dir().unwrap(), version.clone())?;
+        } else if self.packages.len() == 1 && self.packages[0].location == find_root(false).unwrap()
+        {
+            write_custom(find_root(false).unwrap(), version.clone())?;
         } else {
             bail!("no package specified and more than one package in tree");
         }
@@ -107,6 +97,62 @@ impl Nanpa {
 
         Ok(())
     }
+}
+
+fn write_semver(path: path::PathBuf, old_version: String, version: &SemverVersion) -> Result<()> {
+    let file = match fs::File::open(path.join(".nanparc")) {
+        Ok(file) => io::BufReader::new(file),
+        Err(e) => {
+            bail!("{}", e.to_string());
+        }
+    };
+
+    if let Ok(mut parsed) = semver::Version::parse(old_version.as_str()) {
+        match version {
+            SemverVersion::Major => {
+                parsed.major += 1;
+                parsed.minor = 0;
+                parsed.patch = 0;
+                parsed.pre = semver::Prerelease::new("").unwrap();
+            }
+            SemverVersion::Minor => {
+                parsed.minor += 1;
+                parsed.patch = 0;
+                parsed.pre = semver::Prerelease::new("").unwrap();
+            }
+            SemverVersion::Patch => {
+                parsed.patch += 1;
+                parsed.pre = semver::Prerelease::new("").unwrap();
+            }
+            SemverVersion::Prerelease(x) => {
+                parsed.pre = semver::Prerelease::new(x.version.as_str()).unwrap()
+            }
+        };
+
+        let mut lines = vec![];
+        for line in file.lines() {
+            if let Ok(line) = line {
+                if line.starts_with("version") {
+                    lines.push("version ".to_string() + parsed.to_string().as_str())
+                } else {
+                    lines.push(line.clone())
+                }
+            }
+        }
+
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(path.join(".nanparc"))?;
+        f.write_all((lines.join("\n") + "\n").as_bytes())?;
+        f.flush()?;
+
+        println!("{} -> {}", old_version, parsed.to_string());
+    } else {
+        bail!("package version is not a valid semver version");
+    }
+
+    Ok(())
 }
 
 fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
@@ -132,7 +178,7 @@ fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
         .write(true)
         .truncate(true)
         .open(path.join(".nanparc"))?;
-    f.write_all(lines.join("\n").as_bytes())?;
+    f.write_all((lines.join("\n") + "\n").as_bytes())?;
     f.flush()?;
 
     Ok(())
@@ -142,12 +188,14 @@ pub fn new() -> Result<Nanpa> {
     Nanpa::new()
 }
 
-fn find_root() -> Option<path::PathBuf> {
+fn find_root(stdout: bool) -> Option<path::PathBuf> {
     let mut dir = env::current_dir().unwrap();
     if dir.join(".nanparc").exists() {
         Some(dir)
     } else {
-        eprintln!("current directory does not contain .nanparc, searching up");
+        if stdout {
+            eprintln!("current directory does not contain .nanparc, searching up");
+        }
         loop {
             if dir == path::PathBuf::from("/") {
                 return None;
