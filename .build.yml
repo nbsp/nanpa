@@ -1,0 +1,9 @@
+image: alpine/edge
+packages:
+  - cargo
+sources:
+  - https://github.com/nbsp/nanpa
+tasks:
+  - build: |
+      cd nanpa
+      cargo build --release
