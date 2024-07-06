@@ -14,7 +14,13 @@ enum Commands {
     /// Show current package version
     Version,
     /// Bump package version from changesets and generate changelog entry
-    Changeset { package: Option<String> },
+    Changeset {
+        package: Option<String>,
+
+        /// Accept changeset without passing through editor
+        #[arg(short)]
+        yes: bool,
+    },
     /// Manually bump package version
     #[command(args_conflicts_with_subcommands = true)]
     Bump {
@@ -74,7 +80,7 @@ pub fn command() -> Result<()> {
                 println!("{}: {}", location, package.version.unwrap());
             }
         }
-        Commands::Changeset { package } => nanpa.changesets(package.clone())?,
+        Commands::Changeset { package, yes } => nanpa.changesets(package.clone(), yes.clone())?,
     }
 
     Ok(())

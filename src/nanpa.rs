@@ -7,7 +7,7 @@ use kdl::{KdlDocument, KdlNode};
 use semver;
 use std::{
     collections, env, fs,
-    io::{self, BufRead, Write},
+    io::{self, BufRead, Read, Write},
     path, process,
 };
 
@@ -97,12 +97,12 @@ impl Nanpa {
         Ok(())
     }
 
-    pub fn changesets(&self, package: Option<String>) -> Result<()> {
+    pub fn changesets(&self, package: Option<String>, yes: bool) -> Result<()> {
         if let Some(path) = package {
             let path = path::PathBuf::from(path);
             let path = fs::canonicalize(&path).unwrap();
             if let Some(package) = self.packages().get(path.to_str().unwrap()).cloned() {
-                changesets(package)?;
+                changesets(package, yes)?;
             } else {
                 bail!("could not find package");
             }
@@ -113,6 +113,7 @@ impl Nanpa {
                     .get(find_root(false).unwrap().to_str().unwrap())
                     .unwrap()
                     .clone(),
+                yes,
             )?
         } else {
             todo!("update all packages under tree");
@@ -163,7 +164,7 @@ fn write_semver(package: package::Package, version: &SemverVersion) -> Result<St
             }
         }
 
-        let mut f = std::fs::OpenOptions::new()
+        let mut f = fs::OpenOptions::new()
             .write(true)
             .truncate(true)
             .open(package.location.join(".nanparc"))?;
@@ -203,7 +204,7 @@ fn write_custom(package: package::Package, version: String) -> Result<()> {
         }
     }
 
-    let mut f = std::fs::OpenOptions::new()
+    let mut f = fs::OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(package.location.join(".nanparc"))?;
@@ -247,9 +248,10 @@ fn run_custom(package: package::Package) -> Result<()> {
     Ok(())
 }
 
-fn changesets(package: package::Package) -> Result<()> {
+fn changesets(package: package::Package, yes: bool) -> Result<()> {
     let mut bump = 0;
     let mut changelog = Changelog::new();
+    let mut to_delete: Vec<path::PathBuf> = vec![];
 
     env::set_current_dir(find_root(false).unwrap())?;
     for file in glob(".nanpa/*.kdl")? {
@@ -264,7 +266,9 @@ fn changesets(package: package::Package) -> Result<()> {
                 })
             })
             .collect();
-        let delete = !nodes.is_empty();
+        if !nodes.is_empty() {
+            to_delete.push(file)
+        }
         for node in nodes {
             if node.get(0).cloned().is_some() {
                 match node.name().to_string().as_str() {
@@ -287,9 +291,6 @@ fn changesets(package: package::Package) -> Result<()> {
                     unknown => bail!("unknown keyword {unknown}"),
                 }
             }
-        }
-        if delete {
-            fs::remove_file(file)?
         }
     }
 
@@ -320,20 +321,88 @@ fn changesets(package: package::Package) -> Result<()> {
                 }
             }
         }
-        fs::remove_file(file)?;
+        to_delete.push(file);
     }
 
-    let version = match bump {
-        0 => return Ok(()),
+    let semver = semver::Version::parse(package.version.clone().unwrap().as_str());
+    if semver.is_err() {
+        bail!("package version is not a valid semver version");
+    }
+    let mut version = semver.unwrap();
+    match bump {
+        0 => {
+            println!("no changesets found");
+            return Ok(());
+        }
+        3 => {
+            version.major += 1;
+            version.minor = 0;
+            version.patch = 0;
+            version.pre = semver::Prerelease::new("").unwrap();
+        }
+        2 => {
+            version.minor += 1;
+            version.patch = 0;
+            version.pre = semver::Prerelease::new("").unwrap();
+        }
+        1 => {
+            version.patch += 1;
+            version.pre = semver::Prerelease::new("").unwrap();
+        }
+        _ => bail!("something has gone horribly wrong"),
+    };
+    let version = version.to_string();
+
+    let mut markdown = changelog.markdown(version);
+    if !yes {
+        if let Ok(editor) = env::var("EDITOR") {
+            let mut tmpfile = env::temp_dir();
+            tmpfile.push("CHANGESET_EDITMSG.md");
+            let mut buffer = fs::File::create(&tmpfile)?;
+            writeln!(buffer, "{}", markdown.trim())?;
+            let status = process::Command::new(editor).arg(&tmpfile).status()?;
+            markdown = "".to_string();
+            fs::File::open(tmpfile)?.read_to_string(&mut markdown)?;
+
+            if markdown.trim().is_empty() || !status.success() {
+                println!("no changelog found, aborting");
+                return Ok(());
+            }
+        } else {
+            bail!("EDITOR must be set");
+        }
+    }
+
+    let changelog = fs::read_to_string(path::PathBuf::from("CHANGELOG.md"))
+        .unwrap_or("# Changelog\n\n".to_string());
+    let (prologue, changelog) = changelog
+        .split_once("##")
+        .unwrap_or((changelog.as_str(), ""));
+    let changelog = if changelog.is_empty() {
+        changelog.to_string()
+    } else {
+        "\n## ".to_string() + changelog.trim() + "\n"
+    };
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open("CHANGELOG.md")?;
+    f.write_all(prologue.as_bytes())?;
+    f.write_all((markdown.trim().to_string() + "\n").as_bytes())?;
+    f.write_all(changelog.as_bytes())?;
+    f.flush()?;
+
+    match bump {
         1 => write_semver(package, &SemverVersion::Patch)?,
         2 => write_semver(package, &SemverVersion::Minor)?,
         3 => write_semver(package, &SemverVersion::Major)?,
         _ => bail!("something has gone horribly wrong"),
     };
 
-    let markdown = changelog.markdown(version);
-    println!("{markdown}");
-
+    for file in to_delete {
+        fs::remove_file(file)?;
+    }
     Ok(())
 }
 
