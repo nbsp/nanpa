@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-
+use glob::glob;
 use std::{
     fs,
     io::{self, BufRead},
@@ -45,7 +45,9 @@ impl Package {
                 match keyword {
                     "packages" => {
                         for &subpackage in rest {
-                            subpackages.push(Package::get(path.join(subpackage))?)
+                            for entry in glob(subpackage)? {
+                                subpackages.push(Package::get(entry?)?)
+                            }
                         }
                     }
                     "version" => {
