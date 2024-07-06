@@ -6,6 +6,7 @@ use std::{
     path,
 };
 
+#[derive(Clone)]
 pub struct Package {
     // only used for package traversal, flattened
     subpackages: Vec<Package>,

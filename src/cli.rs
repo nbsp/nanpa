@@ -67,9 +67,9 @@ pub fn command() -> Result<()> {
             }
         }
         Commands::Version => {
-            let versions = nanpa.get_version();
-            for (location, version) in versions {
-                println!("{}: {}", location, version);
+            let versions = nanpa.packages();
+            for (location, package) in versions {
+                println!("{}: {}", location, package.version.unwrap());
             }
         }
     }

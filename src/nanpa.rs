@@ -2,12 +2,10 @@ use crate::cli::SemverVersion;
 use crate::package;
 use anyhow::{bail, Result};
 use semver;
-use std::env;
-use std::io::Write;
 use std::{
-    collections, fs,
-    io::{self, BufRead},
-    path,
+    collections, env, fs,
+    io::{self, BufRead, Write},
+    path, process,
 };
 
 pub struct Nanpa {
@@ -27,40 +25,32 @@ impl Nanpa {
         })
     }
 
-    pub fn get_version(&self) -> collections::HashMap<String, String> {
-        let mut versions = collections::HashMap::new();
+    pub fn packages(&self) -> collections::HashMap<String, package::Package> {
+        let mut packages = collections::HashMap::new();
 
-        for package in &self.packages {
-            versions.insert(
+        for package in self.packages.clone() {
+            packages.insert(
                 package.location.to_str().unwrap().to_string(),
-                package.version.clone().unwrap(),
+                package.clone(),
             );
         }
 
-        versions
+        packages
     }
 
     pub fn bump_semver(&self, version: &SemverVersion, package: Option<String>) -> Result<()> {
         if let Some(path) = package {
             let path = path::PathBuf::from(path);
             let path = fs::canonicalize(&path).unwrap();
-            if self.get_version().contains_key(path.to_str().unwrap()) {
-                write_semver(
-                    path.clone(),
-                    self.get_version()
-                        .get(path.to_str().unwrap())
-                        .unwrap()
-                        .clone(),
-                    version,
-                )?;
+            if let Some(package) = self.packages().get(path.to_str().unwrap()).cloned() {
+                write_semver(package, version)?;
             } else {
                 bail!("could not find package");
             }
         } else if self.packages.len() == 1 && self.packages[0].location == find_root(false).unwrap()
         {
             write_semver(
-                find_root(false).unwrap(),
-                self.get_version()
+                self.packages()
                     .get(find_root(false).unwrap().to_str().unwrap())
                     .unwrap()
                     .clone(),
@@ -77,14 +67,20 @@ impl Nanpa {
         if let Some(path) = package {
             let path = path::PathBuf::from(path);
             let path = fs::canonicalize(&path).unwrap();
-            if self.get_version().contains_key(path.to_str().unwrap()) {
-                write_custom(path, version.clone())?;
+            if let Some(package) = self.packages().get(path.to_str().unwrap()).cloned() {
+                write_custom(package, version.clone())?;
             } else {
                 bail!("could not find package");
             }
         } else if self.packages.len() == 1 && self.packages[0].location == find_root(false).unwrap()
         {
-            write_custom(find_root(false).unwrap(), version.clone())?;
+            write_custom(
+                self.packages()
+                    .get(find_root(false).unwrap().to_str().unwrap())
+                    .unwrap()
+                    .clone(),
+                version.clone(),
+            )?;
         } else {
             bail!("no package specified and more than one package in tree");
         }
@@ -99,15 +95,15 @@ impl Nanpa {
     }
 }
 
-fn write_semver(path: path::PathBuf, old_version: String, version: &SemverVersion) -> Result<()> {
-    let file = match fs::File::open(path.join(".nanparc")) {
+fn write_semver(package: package::Package, version: &SemverVersion) -> Result<()> {
+    let file = match fs::File::open(package.location.join(".nanparc")) {
         Ok(file) => io::BufReader::new(file),
         Err(e) => {
             bail!("{}", e.to_string());
         }
     };
 
-    if let Ok(mut parsed) = semver::Version::parse(old_version.as_str()) {
+    if let Ok(mut parsed) = semver::Version::parse(package.version.clone().unwrap().as_str()) {
         match version {
             SemverVersion::Major => {
                 parsed.major += 1;
@@ -143,11 +139,17 @@ fn write_semver(path: path::PathBuf, old_version: String, version: &SemverVersio
         let mut f = std::fs::OpenOptions::new()
             .write(true)
             .truncate(true)
-            .open(path.join(".nanparc"))?;
+            .open(package.location.join(".nanparc"))?;
         f.write_all((lines.join("\n") + "\n").as_bytes())?;
         f.flush()?;
 
-        println!("{} -> {}", old_version, parsed.to_string());
+        println!(
+            "{} -> {}",
+            package.version.clone().unwrap(),
+            parsed.to_string()
+        );
+
+        run_custom(package)?;
     } else {
         bail!("package version is not a valid semver version");
     }
@@ -155,8 +157,8 @@ fn write_semver(path: path::PathBuf, old_version: String, version: &SemverVersio
     Ok(())
 }
 
-fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
-    let file = match fs::File::open(path.join(".nanparc")) {
+fn write_custom(package: package::Package, version: String) -> Result<()> {
+    let file = match fs::File::open(package.location.join(".nanparc")) {
         Ok(file) => io::BufReader::new(file),
         Err(e) => {
             bail!("{}", e.to_string());
@@ -177,10 +179,11 @@ fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
     let mut f = std::fs::OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(path.join(".nanparc"))?;
+        .open(package.location.join(".nanparc"))?;
     f.write_all((lines.join("\n") + "\n").as_bytes())?;
     f.flush()?;
 
+    run_custom(package)?;
     Ok(())
 }
 
@@ -206,4 +209,13 @@ fn find_root(stdout: bool) -> Option<path::PathBuf> {
             }
         }
     }
+}
+
+fn run_custom(package: package::Package) -> Result<()> {
+    if let Some(custom) = package.custom {
+        env::set_current_dir(package.location.clone())?;
+        process::Command::new(package.location.join(custom)).spawn()?;
+    }
+
+    Ok(())
 }
