@@ -20,7 +20,7 @@ impl Package {
             Ok(file) => io::BufReader::new(file),
             Err(e) => {
                 util::error(e.to_string().as_str());
-                util::error("refer to nanparc(5) for more information");
+                util::error("refer to nanpa(1) for more information");
                 process::exit(1);
             }
         };

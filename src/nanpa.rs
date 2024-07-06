@@ -1,8 +1,15 @@
 use crate::cli::SemverVersion;
 use crate::package;
 use crate::util;
+use anyhow::Error;
+use anyhow::Result;
 use semver;
-use std::{collections, process};
+use std::io::Write;
+use std::{
+    collections, fs,
+    io::{self, BufRead},
+    path, process,
+};
 
 pub struct Nanpa {
     // only packages with versions
@@ -83,20 +90,59 @@ impl Nanpa {
 
     pub fn bump_custom(&self, version: String, package: Option<String>) {
         if let Some(path) = package {
-            todo!();
+            let path = path::PathBuf::from(path);
+            let path = fs::canonicalize(&path).unwrap();
+            if self.get_version().contains_key(path.to_str().unwrap()) {
+                write_custom(path, version.clone());
+            } else {
+                util::error("could not find package");
+                process::exit(1);
+            }
         } else if self.packages.len() == 1 {
-            println!(
-                "{} -> {}",
-                self.packages[0].version.clone().unwrap(),
-                version,
-            );
-            todo!();
+            write_custom(std::env::current_dir().unwrap(), version.clone());
         } else {
             util::error("no package specified and more than one package in tree");
             util::error("refer to nanparc(5) for more information");
             process::exit(1);
         }
+
+        println!(
+            "{} -> {}",
+            self.packages[0].version.clone().unwrap(),
+            version,
+        );
     }
+}
+
+fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
+    let file = match fs::File::open(path.join(".nanparc")) {
+        Ok(file) => io::BufReader::new(file),
+        Err(e) => {
+            util::error(e.to_string().as_str());
+            util::error("refer to nanpa(1) for more information");
+            return Err(Error::new(e));
+        }
+    };
+
+    let mut lines = vec![];
+    for line in file.lines() {
+        if let Ok(line) = line {
+            if line.starts_with("version") {
+                lines.push("version ".to_string() + version.as_str())
+            } else {
+                lines.push(line.clone())
+            }
+        }
+    }
+
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(path.join(".nanparc"))?;
+    f.write_all(lines.join("\n").as_bytes())?;
+    f.flush()?;
+
+    Ok(())
 }
 
 pub fn new() -> Nanpa {
