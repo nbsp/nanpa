@@ -1,4 +1,5 @@
 use crate::nanpa;
+use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
@@ -46,9 +47,9 @@ struct CustomVersion {
     pub version: String,
 }
 
-pub fn command() {
+pub fn command() -> Result<()> {
     let cli = Cli::parse();
-    let nanpa = nanpa::new();
+    let nanpa = nanpa::new()?;
 
     match &cli.command {
         Commands::Bump {
@@ -57,12 +58,12 @@ pub fn command() {
             package,
         } => {
             if let Some(version) = semver_version {
-                nanpa.bump_semver(version, package.clone());
+                nanpa.bump_semver(version, package.clone())?;
             } else {
                 nanpa.bump_custom(
                     custom_version.as_ref().unwrap().version.clone(),
                     package.clone(),
-                );
+                )?;
             }
         }
         Commands::Version => {
@@ -72,4 +73,6 @@ pub fn command() {
             }
         }
     }
+
+    Ok(())
 }

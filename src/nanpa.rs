@@ -1,14 +1,13 @@
 use crate::cli::SemverVersion;
 use crate::package;
-use crate::util;
-use anyhow::Error;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use semver;
+use std::env;
 use std::io::Write;
 use std::{
     collections, fs,
     io::{self, BufRead},
-    path, process,
+    path,
 };
 
 pub struct Nanpa {
@@ -17,16 +16,15 @@ pub struct Nanpa {
 }
 
 impl Nanpa {
-    pub fn new() -> Self {
-        Self {
-            packages: match util::find_root() {
-                Some(path) => package::Package::get(path).flatten(),
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            packages: match find_root() {
+                Some(path) => package::Package::get(path)?.flatten()?,
                 None => {
-                    util::error("could not find .nanparc file, refer to nanparc(5)");
-                    process::exit(1);
+                    bail!("could not find .nanparc file");
                 }
             },
-        }
+        })
     }
 
     pub fn get_version(&self) -> collections::HashMap<String, String> {
@@ -42,7 +40,7 @@ impl Nanpa {
         versions
     }
 
-    pub fn bump_semver(&self, version: &SemverVersion, package: Option<String>) {
+    pub fn bump_semver(&self, version: &SemverVersion, package: Option<String>) -> Result<()> {
         if let Some(path) = package {
             todo!();
         } else if self.packages.len() == 1 {
@@ -77,33 +75,28 @@ impl Nanpa {
                 );
                 todo!();
             } else {
-                util::error("package version is not a valid semver version");
-                util::error("refer to nanpa(1) for more information");
-                process::exit(1);
+                bail!("package version is not a valid semver version");
             }
         } else {
-            util::error("no package specified and more than one package in tree");
-            util::error("refer to nanparc(5) for more information");
-            process::exit(1);
+            bail!("no package specified and more than one package in tree");
         }
+
+        Ok(())
     }
 
-    pub fn bump_custom(&self, version: String, package: Option<String>) {
+    pub fn bump_custom(&self, version: String, package: Option<String>) -> Result<()> {
         if let Some(path) = package {
             let path = path::PathBuf::from(path);
             let path = fs::canonicalize(&path).unwrap();
             if self.get_version().contains_key(path.to_str().unwrap()) {
-                write_custom(path, version.clone());
+                write_custom(path, version.clone())?;
             } else {
-                util::error("could not find package");
-                process::exit(1);
+                bail!("could not find package");
             }
         } else if self.packages.len() == 1 {
-            write_custom(std::env::current_dir().unwrap(), version.clone());
+            write_custom(std::env::current_dir().unwrap(), version.clone())?;
         } else {
-            util::error("no package specified and more than one package in tree");
-            util::error("refer to nanparc(5) for more information");
-            process::exit(1);
+            bail!("no package specified and more than one package in tree");
         }
 
         println!(
@@ -111,6 +104,8 @@ impl Nanpa {
             self.packages[0].version.clone().unwrap(),
             version,
         );
+
+        Ok(())
     }
 }
 
@@ -118,9 +113,7 @@ fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
     let file = match fs::File::open(path.join(".nanparc")) {
         Ok(file) => io::BufReader::new(file),
         Err(e) => {
-            util::error(e.to_string().as_str());
-            util::error("refer to nanpa(1) for more information");
-            return Err(Error::new(e));
+            bail!("{}", e.to_string());
         }
     };
 
@@ -145,6 +138,24 @@ fn write_custom(path: path::PathBuf, version: String) -> Result<()> {
     Ok(())
 }
 
-pub fn new() -> Nanpa {
+pub fn new() -> Result<Nanpa> {
     Nanpa::new()
+}
+
+fn find_root() -> Option<path::PathBuf> {
+    let mut dir = env::current_dir().unwrap();
+    if dir.join(".nanparc").exists() {
+        Some(dir)
+    } else {
+        eprintln!("current directory does not contain .nanparc, searching up");
+        loop {
+            if dir == path::PathBuf::from("/") {
+                return None;
+            }
+            dir.pop();
+            if dir.join(".nanparc").exists() {
+                return Some(dir);
+            }
+        }
+    }
 }

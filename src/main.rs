@@ -1,8 +1,11 @@
 mod cli;
 mod nanpa;
 mod package;
-mod util;
+
+use colored::Colorize;
 
 fn main() {
-    cli::command();
+    if let Err(e) = cli::command() {
+        eprintln!("{} {}", "error:".red().bold(), e);
+    };
 }
