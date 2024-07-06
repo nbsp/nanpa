@@ -13,6 +13,7 @@ pub struct Package {
     pub language: Option<String>,
     pub custom: Option<String>,
     pub location: path::PathBuf,
+    pub name: Option<String>,
 }
 
 impl Package {
@@ -28,6 +29,7 @@ impl Package {
         let mut version: Option<String> = None;
         let mut language: Option<String> = None;
         let mut custom: Option<String> = None;
+        let mut name: Option<String> = None;
 
         for line in config.lines() {
             if let Ok(line) = line {
@@ -54,6 +56,9 @@ impl Package {
                     }
                     "custom" => {
                         custom = Some(rest[0].to_string());
+                    }
+                    "name" => {
+                        name = Some(rest[0].to_string());
                     }
                     unknown => {
                         bail!("unknown keyword {unknown}")
@@ -84,12 +89,20 @@ impl Package {
             );
         }
 
+        if version.is_some() && language.is_none() && name.is_none() {
+            bail!(
+                "{}: packages without a supported language must have a name",
+                path.to_str().unwrap().to_string()
+            );
+        }
+
         Ok(Self {
             subpackages,
             version,
             language,
             custom,
             location: path,
+            name,
         })
     }
 
