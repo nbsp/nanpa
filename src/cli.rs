@@ -99,7 +99,6 @@ pub fn command() -> Result<()> {
                 "typescript".yellow(),
                 "ts".yellow(),
             );
-            println!("Go\t\t {}", "go".yellow().bold(),);
         }
     }
 
