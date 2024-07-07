@@ -18,6 +18,16 @@
         # For `nix build` & `nix run`:
         defaultPackage = naersk'.buildPackage {
           src = ./.;
+
+          nativeBuildInputs = with pkgs; [ scdoc installShellFiles ];
+          override.postBuild = ''
+            scdoc < ${ ./doc/nanpa.1.scd } > nanpa.1
+            scdoc < ${ ./doc/nanparc.5.scd } > nanparc.5
+            scdoc < ${ ./doc/nanpa-changeset.5.scd } > nanpa-changeset.5
+          '';
+          postInstall = ''
+            installManPage nanpa.1 nanparc.5 nanpa-changeset.5
+          '';
         };
 
         # For `nix develop`:
