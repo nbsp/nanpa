@@ -89,7 +89,8 @@ impl Nanpa {
         }
 
         println!(
-            "{} -> {}",
+            "{}: {} -> {}",
+            self.packages[0].location.to_str().unwrap(),
             self.packages[0].version.clone().unwrap(),
             version,
         );
@@ -176,7 +177,8 @@ fn write_semver(package: package::Package, version: &SemverVersion) -> Result<St
         f.flush()?;
 
         println!(
-            "{} -> {}",
+            "{}: {} -> {}",
+            package.location.to_str().unwrap(),
             package.version.clone().unwrap(),
             parsed.to_string()
         );
@@ -343,12 +345,18 @@ fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Resu
 
     let semver = semver::Version::parse(package.version.clone().unwrap().as_str());
     if semver.is_err() {
-        bail!("package version is not a valid semver version");
+        bail!(
+            "{}: package version is not a valid semver version",
+            package.location.to_str().unwrap()
+        );
     }
     let mut version = semver.unwrap();
     match bump {
         0 => {
-            println!("no changesets found");
+            println!(
+                "{}: no changesets found",
+                package.location.to_str().unwrap()
+            );
             return Ok(());
         }
         3 => {
@@ -382,7 +390,10 @@ fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Resu
             fs::File::open(tmpfile)?.read_to_string(&mut markdown)?;
 
             if markdown.trim().is_empty() || !status.success() {
-                println!("no changelog found, aborting");
+                println!(
+                    "{}: no changelog found, aborting",
+                    package.location.to_str().unwrap()
+                );
                 return Ok(());
             }
         } else {
