@@ -262,9 +262,10 @@ fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Resu
     env::set_current_dir(root)?;
     for file in glob(".nanpa/*.kdl")? {
         let file = file?;
-        let changeset: KdlDocument = fs::read_to_string(file.clone())?.parse()?;
-        let nodes: Vec<&KdlNode> = changeset
-            .nodes()
+        let mut changeset: KdlDocument = fs::read_to_string(file.clone())?.parse()?;
+        let nodes = changeset.nodes_mut();
+        let nodes_cloned = nodes.clone();
+        let package_nodes: Vec<&KdlNode> = nodes_cloned
             .iter()
             .filter(|change| {
                 change.get("package").is_some_and(|path| {
@@ -272,10 +273,7 @@ fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Resu
                 })
             })
             .collect();
-        if !nodes.is_empty() {
-            to_delete.push(fs::canonicalize(file.to_str().unwrap().to_string()).unwrap())
-        }
-        for node in nodes {
+        for node in package_nodes {
             if node.get(0).cloned().is_some() {
                 match node.name().to_string().as_str() {
                     "major" => {
@@ -297,6 +295,19 @@ fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Resu
                     unknown => bail!("{}: unknown keyword {unknown}", file.to_str().unwrap()),
                 }
             }
+
+            nodes.remove(nodes.iter().position(|x| *x == *node).unwrap());
+        }
+        if changeset.nodes().is_empty() {
+            to_delete.push(fs::canonicalize(file.to_str().unwrap().to_string()).unwrap())
+        } else {
+            let mut f = fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(file)?;
+            f.write_all(changeset.to_string().as_bytes())?;
+            f.flush()?;
         }
     }
 
