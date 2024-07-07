@@ -21,9 +21,7 @@ impl Package {
     pub fn get(path: path::PathBuf) -> Result<Self> {
         let config = match fs::File::open(path.join(".nanparc")) {
             Ok(file) => io::BufReader::new(file),
-            Err(e) => {
-                bail!(e);
-            }
+            Err(e) => bail!(e),
         };
 
         let mut subpackages = vec![];
@@ -47,7 +45,7 @@ impl Package {
                     "packages" => {
                         for &subpackage in rest {
                             for entry in glob(subpackage)? {
-                                subpackages.push(Package::get(entry?)?)
+                                subpackages.push(Package::get(path.join(entry?))?)
                             }
                         }
                     }

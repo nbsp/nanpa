@@ -102,7 +102,7 @@ impl Nanpa {
             let path = path::PathBuf::from(path);
             let path = fs::canonicalize(&path).unwrap();
             if let Some(package) = self.packages().get(path.to_str().unwrap()).cloned() {
-                changesets(package, yes)?;
+                changesets(package, find_root(false).unwrap(), yes)?;
             } else {
                 bail!("could not find package");
             }
@@ -113,11 +113,13 @@ impl Nanpa {
                     .get(find_root(false).unwrap().to_str().unwrap())
                     .unwrap()
                     .clone(),
+                find_root(false).unwrap(),
                 yes,
             )?
         } else {
+            let root = fs::canonicalize(find_root(false).unwrap()).unwrap();
             for package in self.packages().values() {
-                changesets(package.clone(), yes)?;
+                changesets(package.clone(), root.clone(), yes)?;
             }
         }
 
@@ -252,12 +254,12 @@ fn run_custom(package: package::Package) -> Result<()> {
     Ok(())
 }
 
-fn changesets(package: package::Package, yes: bool) -> Result<()> {
+fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Result<()> {
     let mut bump = 0;
     let mut changelog = Changelog::new();
     let mut to_delete: Vec<path::PathBuf> = vec![];
 
-    env::set_current_dir(find_root(false).unwrap())?;
+    env::set_current_dir(root)?;
     for file in glob(".nanpa/*.kdl")? {
         let file = file?;
         let changeset: KdlDocument = fs::read_to_string(file.clone())?.parse()?;
@@ -266,12 +268,12 @@ fn changesets(package: package::Package, yes: bool) -> Result<()> {
             .iter()
             .filter(|change| {
                 change.get("package").is_some_and(|path| {
-                    package.location == fs::canonicalize(path.to_string()).unwrap()
+                    package.location == fs::canonicalize(path.value().as_string().unwrap()).unwrap()
                 })
             })
             .collect();
         if !nodes.is_empty() {
-            to_delete.push(file)
+            to_delete.push(fs::canonicalize(file.to_str().unwrap().to_string()).unwrap())
         }
         for node in nodes {
             if node.get(0).cloned().is_some() {
@@ -292,7 +294,7 @@ fn changesets(package: package::Package, yes: bool) -> Result<()> {
                         }
                         changelog.push(node.clone())?;
                     }
-                    unknown => bail!("unknown keyword {unknown}"),
+                    unknown => bail!("{}: unknown keyword {unknown}", file.to_str().unwrap()),
                 }
             }
         }
