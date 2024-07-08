@@ -1,6 +1,8 @@
 # nanpa
 a language-agnostic release manager
 
+![GitHub Tag](https://img.shields.io/github/v/tag/nbsp/nanpa?sort=date) [![builds.sr.ht status](https://builds.sr.ht/~nbsp/nanpa/commits/master.svg)](https://builds.sr.ht/~nbsp/nanpa/commits/master?)
+
 > [!NOTE]
 > nanpa is a command-line tool. for continuous integration, [ilo](https://github.com/nbsp/ilo)
 > is a GitHub bot and workflow action that uses nanpa to automate package updates.
