@@ -364,11 +364,28 @@ fn changesets(
     let mut version = semver.unwrap();
     match bump {
         0 => {
-            println!(
-                "{}: no changesets found",
-                package.location.to_str().unwrap()
-            );
-            return Ok(());
+            if !version.pre.is_empty() {
+                if let Some(pre) = pre {
+                    let head = version.pre.split_once(".").unwrap().0;
+                    if head != pre {
+                        version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
+                    } else {
+                        println!(
+                            "{}: no changesets found",
+                            package.location.to_str().unwrap()
+                        );
+                        return Ok(());
+                    }
+                } else {
+                    version.pre = semver::Prerelease::EMPTY;
+                }
+            } else {
+                println!(
+                    "{}: no changesets found",
+                    package.location.to_str().unwrap()
+                );
+                return Ok(());
+            }
         }
         3 => {
             if version.minor == 0 && version.patch == 0 && !version.pre.is_empty() && pre.is_some()
