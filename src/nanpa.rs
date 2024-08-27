@@ -430,7 +430,11 @@ fn changesets(
                 }
             } else {
                 version.patch += 1;
-                version.pre = semver::Prerelease::new("").unwrap();
+                if let Some(pre) = pre {
+                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                } else {
+                    version.pre = semver::Prerelease::new("").unwrap();
+                }
             }
         }
         _ => bail!("something has gone horribly wrong"),
