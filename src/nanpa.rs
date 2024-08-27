@@ -441,7 +441,7 @@ fn changesets(
     };
     let version = version.to_string();
 
-    let mut markdown = changelog.markdown(version);
+    let mut markdown = changelog.markdown(version.clone());
     if !yes {
         if let Ok(editor) = env::var("EDITOR") {
             let mut tmpfile = env::temp_dir();
@@ -484,12 +484,14 @@ fn changesets(
     f.write_all(changelog.as_bytes())?;
     f.flush()?;
 
-    match bump {
-        1 => write_semver(package, &SemverVersion::Patch)?,
-        2 => write_semver(package, &SemverVersion::Minor)?,
-        3 => write_semver(package, &SemverVersion::Major)?,
-        _ => bail!("something has gone horribly wrong"),
-    };
+    println!(
+        "{}: {} -> {}",
+        package.location.to_str().unwrap(),
+        package.version.clone().unwrap(),
+        version,
+    );
+
+    write_custom(package, version)?;
 
     for file in to_delete {
         fs::remove_file(file)?;
