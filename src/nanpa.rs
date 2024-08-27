@@ -381,14 +381,14 @@ fn changesets(
                     version.pre =
                         semver::Prerelease::new(format!("{head}.{tail}").as_str()).unwrap();
                 } else {
-                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                    version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
                 }
             } else {
                 version.major += 1;
                 version.minor = 0;
                 version.patch = 0;
                 if let Some(pre) = pre {
-                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                    version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
                 } else {
                     version.pre = semver::Prerelease::new("").unwrap();
                 }
@@ -404,13 +404,13 @@ fn changesets(
                     version.pre =
                         semver::Prerelease::new(format!("{head}.{tail}").as_str()).unwrap();
                 } else {
-                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                    version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
                 }
             } else {
                 version.minor += 1;
                 version.patch = 0;
                 if let Some(pre) = pre {
-                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                    version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
                 } else {
                     version.pre = semver::Prerelease::new("").unwrap();
                 }
@@ -426,12 +426,12 @@ fn changesets(
                     version.pre =
                         semver::Prerelease::new(format!("{head}.{tail}").as_str()).unwrap();
                 } else {
-                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                    version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
                 }
             } else {
                 version.patch += 1;
                 if let Some(pre) = pre {
-                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                    version.pre = semver::Prerelease::new(format!("{pre}.0").as_str()).unwrap();
                 } else {
                     version.pre = semver::Prerelease::new("").unwrap();
                 }
