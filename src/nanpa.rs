@@ -98,12 +98,17 @@ impl Nanpa {
         Ok(())
     }
 
-    pub fn changesets(&self, package: Option<String>, yes: bool) -> Result<()> {
+    pub fn changesets(
+        &self,
+        package: Option<String>,
+        pre: Option<String>,
+        yes: bool,
+    ) -> Result<()> {
         if let Some(path) = package {
             let path = path::PathBuf::from(path);
             let path = fs::canonicalize(&path).unwrap();
             if let Some(package) = self.packages().get(path.to_str().unwrap()).cloned() {
-                changesets(package, find_root(false).unwrap(), yes)?;
+                changesets(package, find_root(false).unwrap(), pre, yes)?;
             } else {
                 bail!("could not find package");
             }
@@ -115,12 +120,13 @@ impl Nanpa {
                     .unwrap()
                     .clone(),
                 find_root(false).unwrap(),
+                pre,
                 yes,
             )?
         } else {
             let root = fs::canonicalize(find_root(false).unwrap()).unwrap();
             for package in self.packages().values() {
-                changesets(package.clone(), root.clone(), yes)?;
+                changesets(package.clone(), root.clone(), pre.clone(), yes)?;
             }
         }
 
@@ -256,7 +262,12 @@ fn run_custom(package: package::Package) -> Result<()> {
     Ok(())
 }
 
-fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Result<()> {
+fn changesets(
+    package: package::Package,
+    root: path::PathBuf,
+    pre: Option<String>,
+    yes: bool,
+) -> Result<()> {
     let mut bump = 0;
     let mut changelog = Changelog::new();
     let mut to_delete: Vec<path::PathBuf> = vec![];
@@ -360,19 +371,67 @@ fn changesets(package: package::Package, root: path::PathBuf, yes: bool) -> Resu
             return Ok(());
         }
         3 => {
-            version.major += 1;
-            version.minor = 0;
-            version.patch = 0;
-            version.pre = semver::Prerelease::new("").unwrap();
+            if version.minor == 0 && version.patch == 0 && !version.pre.is_empty() && pre.is_some()
+            {
+                // XXX: assumes prerelease matches `^[\w\d]+\.\d+$`
+                let (head, tail) = version.pre.split_once(".").unwrap();
+                let pre = pre.unwrap();
+                if pre == head {
+                    let tail = tail.parse::<u8>().unwrap() + 1;
+                    version.pre =
+                        semver::Prerelease::new(format!("{head}.{tail}").as_str()).unwrap();
+                } else {
+                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                }
+            } else {
+                version.major += 1;
+                version.minor = 0;
+                version.patch = 0;
+                if let Some(pre) = pre {
+                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                } else {
+                    version.pre = semver::Prerelease::new("").unwrap();
+                }
+            }
         }
         2 => {
-            version.minor += 1;
-            version.patch = 0;
-            version.pre = semver::Prerelease::new("").unwrap();
+            if version.patch == 0 && !version.pre.is_empty() && pre.is_some() {
+                // XXX: assumes prerelease matches `^[\w\d]+\.\d+$`
+                let (head, tail) = version.pre.split_once(".").unwrap();
+                let pre = pre.unwrap();
+                if pre == head {
+                    let tail = tail.parse::<u8>().unwrap() + 1;
+                    version.pre =
+                        semver::Prerelease::new(format!("{head}.{tail}").as_str()).unwrap();
+                } else {
+                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                }
+            } else {
+                version.minor += 1;
+                version.patch = 0;
+                if let Some(pre) = pre {
+                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                } else {
+                    version.pre = semver::Prerelease::new("").unwrap();
+                }
+            }
         }
         1 => {
-            version.patch += 1;
-            version.pre = semver::Prerelease::new("").unwrap();
+            if !version.pre.is_empty() && pre.is_some() {
+                // XXX: assumes prerelease matches `^[\w\d]+\.\d+$`
+                let (head, tail) = version.pre.split_once(".").unwrap();
+                let pre = pre.unwrap();
+                if pre == head {
+                    let tail = tail.parse::<u8>().unwrap() + 1;
+                    version.pre =
+                        semver::Prerelease::new(format!("{head}.{tail}").as_str()).unwrap();
+                } else {
+                    version.pre = semver::Prerelease::new(format!("{pre}.1").as_str()).unwrap();
+                }
+            } else {
+                version.patch += 1;
+                version.pre = semver::Prerelease::new("").unwrap();
+            }
         }
         _ => bail!("something has gone horribly wrong"),
     };

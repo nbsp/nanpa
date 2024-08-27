@@ -18,6 +18,10 @@ enum Commands {
     Changeset {
         package: Option<String>,
 
+        /// Tag version as a prerelease
+        #[arg(long, value_name = "TYPE")]
+        pre: Option<String>,
+
         /// Accept changeset without passing through editor
         #[arg(short)]
         yes: bool,
@@ -83,7 +87,9 @@ pub fn command() -> Result<()> {
                 println!("{}: {}", location, package.version.unwrap());
             }
         }
-        Commands::Changeset { package, yes } => nanpa.changesets(package.clone(), yes.clone())?,
+        Commands::Changeset { package, pre, yes } => {
+            nanpa.changesets(package.clone(), pre.clone(), yes.clone())?
+        }
         Commands::ListLanguages => {
             println!("{}", "Supported languages:".bold().underline());
             println!(
