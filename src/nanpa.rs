@@ -233,7 +233,7 @@ pub fn new() -> Result<Nanpa> {
     Nanpa::new()
 }
 
-fn find_root(stdout: bool) -> Option<path::PathBuf> {
+pub fn find_root(stdout: bool) -> Option<path::PathBuf> {
     let mut dir = env::current_dir().unwrap();
     if dir.join(".nanparc").exists() {
         Some(dir)
