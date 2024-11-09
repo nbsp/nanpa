@@ -351,7 +351,7 @@ fn changesets(
                 }
             }
         }
-        to_delete.push(file);
+        to_delete.push(fs::canonicalize(file.to_str().unwrap().to_string()).unwrap());
     }
 
     let semver = semver::Version::parse(package.version.clone().unwrap().as_str());
