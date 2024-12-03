@@ -1,6 +1,6 @@
 [package]
 name = "nanpa"
-version = "0.2.1"
+version = "0.2.3"
 description = "a language-agnostic release manager"
 license = "MIT"
 authors = ["aoife cassidy <aoife@enby.space>"]

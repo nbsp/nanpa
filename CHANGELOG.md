@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.3] - 2024-12-03
+
+### Fixed
+
+- fix roots handling on cargo
+
+## [0.2.2] - 2024-12-03
+
+### Fixed
+
+- fix roots handling on cargo
+
 ## [0.2.1] - 2024-11-10
 
 ### Fixed
