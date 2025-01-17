@@ -53,7 +53,8 @@ Example:
 ## Custom
 
 Run a file on package version bump. Can be a relative or absolute path. Does not
-take arguments, and does not respect _$PATH_.
+take arguments, and does not respect _$PATH_. An environmental variable
+_$VERSION_ is supplied to the file, which contains the package version.
 
 Example:
 	custom bump_python.sh

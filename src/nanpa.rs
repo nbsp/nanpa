@@ -190,7 +190,7 @@ fn write_semver(package: package::Package, version: &SemverVersion) -> Result<St
         );
 
         run_language(package.clone(), parsed.to_string())?;
-        run_custom(package)?;
+        run_custom(package, parsed.to_string())?;
 
         Ok(parsed.to_string())
     } else {
@@ -224,8 +224,8 @@ fn write_custom(package: package::Package, version: String) -> Result<()> {
     f.write_all((lines.join("\n") + "\n").as_bytes())?;
     f.flush()?;
 
-    run_language(package.clone(), version)?;
-    run_custom(package)?;
+    run_language(package.clone(), version.clone())?;
+    run_custom(package, version)?;
     Ok(())
 }
 
@@ -253,8 +253,9 @@ pub fn find_root(stdout: bool) -> Option<path::PathBuf> {
     }
 }
 
-fn run_custom(package: package::Package) -> Result<()> {
+fn run_custom(package: package::Package, parsed: String) -> Result<()> {
     if let Some(custom) = package.custom {
+        env::set_var("VERSION", parsed);
         env::set_current_dir(package.location.clone())?;
         process::Command::new(package.location.join(custom)).spawn()?;
     }
