@@ -27,6 +27,10 @@ file includes subpackages, *nanpa changesets* will be run for each of them.
 If called with the *--pre* argument, the new version will be calculated as a
 prerelease of the desired type.
 
+*nanpa add* <major|minor|patch> adds a changeset file to be handled by *nanpa
+changesets*. you may feed it the type, subpackage and description at the command
+line, and it will open an editor with them pre-written.
+
 *nanpa bump* <major|minor|patch|pre _prerelease_|_custom_> [_package_] manually
 bumps the package version, either according to Semantic Versioning or with a
 custom version. If _package_ isn't provided, *nanpa* will traverse up the tree

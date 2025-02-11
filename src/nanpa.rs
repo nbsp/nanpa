@@ -1,9 +1,11 @@
+use crate::cli::SemverVersionAdd;
 use crate::package;
 use crate::{cli::SemverVersion, languages};
 use anyhow::{bail, Result};
 use chrono;
 use glob::glob;
 use kdl::{KdlDocument, KdlNode};
+use rand::prelude::IndexedRandom;
 use semver;
 use std::{
     collections, env, fs,
@@ -129,6 +131,24 @@ impl Nanpa {
                 changesets(package.clone(), root.clone(), pre.clone(), yes)?;
             }
         }
+
+        Ok(())
+    }
+
+    pub fn add(
+        &self,
+        package: Option<String>,
+        bump: SemverVersionAdd,
+        change_type: Option<String>,
+        message: Option<String>,
+    ) -> Result<()> {
+        add_changeset(
+            package,
+            find_root(false).unwrap(),
+            bump,
+            change_type,
+            message,
+        )?;
 
         Ok(())
     }
@@ -517,6 +537,52 @@ fn changesets(
     Ok(())
 }
 
+fn add_changeset(
+    package: Option<String>,
+    mut fpath: path::PathBuf,
+    bump: SemverVersionAdd,
+    change_type: Option<String>,
+    message: Option<String>,
+) -> Result<()> {
+    if let Ok(editor) = env::var("EDITOR") {
+        fpath.push(".nanpa");
+        _ = fs::create_dir(fpath.clone());
+        fpath.push(format!("{}.kdl", gen_changeset_name()));
+        let mut buffer = fs::File::create(&fpath)?;
+
+        let mut initial = match bump {
+            SemverVersionAdd::Major => "major ",
+            SemverVersionAdd::Minor => "minor ",
+            SemverVersionAdd::Patch => "patch ",
+        }
+        .to_string();
+        if let Some(package) = package {
+            initial += format!("package=\"{}\" ", package).as_str();
+        }
+        initial += format!(
+            "type=\"{}\" \"{}\"",
+            change_type.unwrap_or_default(),
+            message.unwrap_or_default()
+        )
+        .as_str();
+
+        writeln!(buffer, "{}", initial)?;
+        let status = process::Command::new(editor).arg(&fpath).status()?;
+        let mut done = "".to_string();
+        fs::File::open(fpath.clone())?.read_to_string(&mut done)?;
+
+        if done.trim().is_empty() || !status.success() {
+            println!("empty changeset, aborting",);
+            fs::remove_file(fpath)?;
+            return Ok(());
+        }
+    } else {
+        bail!("EDITOR must be set");
+    }
+
+    Ok(())
+}
+
 struct Changelog {
     pub added: Vec<String>,
     pub changed: Vec<String>,
@@ -623,4 +689,13 @@ fn run_language(package: package::Package, version: String) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn gen_changeset_name() -> String {
+    let words: Vec<&str> = include_str!("eff_short_wordlist.txt").lines().collect();
+
+    let mut rng = rand::rng();
+    let random_words: Vec<&str> = words.choose_multiple(&mut rng, 3).copied().collect();
+
+    random_words.join("-")
 }

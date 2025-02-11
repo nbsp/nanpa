@@ -1,6 +1,6 @@
 use crate::nanpa;
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 
 #[derive(Parser)]
@@ -26,6 +26,20 @@ enum Commands {
         #[arg(short)]
         yes: bool,
     },
+    /// Add a changeset
+    Add {
+        #[arg(value_enum)]
+        bump: SemverVersionAdd,
+
+        #[arg(long, short)]
+        package: Option<String>,
+
+        #[arg(id = "type", long, short, value_name = "TYPE")]
+        change_type: Option<String>,
+
+        #[arg(long, short)]
+        message: Option<String>,
+    },
     /// Manually bump package version
     #[command(args_conflicts_with_subcommands = true)]
     Bump {
@@ -50,6 +64,16 @@ pub enum SemverVersion {
     #[command(alias = "z")]
     Patch,
     Prerelease(Prerelease),
+}
+
+#[derive(ValueEnum, Clone)]
+pub enum SemverVersionAdd {
+    #[value(alias = "x")]
+    Major,
+    #[value(alias = "y")]
+    Minor,
+    #[value(alias = "z")]
+    Patch,
 }
 
 #[derive(Args)]
@@ -89,6 +113,19 @@ pub fn command() -> Result<()> {
         }
         Commands::Changeset { package, pre, yes } => {
             nanpa.changesets(package.clone(), pre.clone(), yes.clone())?
+        }
+        Commands::Add {
+            bump,
+            package,
+            change_type,
+            message,
+        } => {
+            nanpa.add(
+                package.clone(),
+                bump.clone(),
+                change_type.clone(),
+                message.clone(),
+            )?;
         }
         Commands::ListLanguages => {
             println!("{}", "Supported languages:".bold().underline());

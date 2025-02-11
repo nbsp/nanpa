@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0] - 2025-02-11
+
+### Added
+
+- add 'nanpa add' command
+
 ## [0.2.3] - 2024-12-03
 
 ### Fixed
